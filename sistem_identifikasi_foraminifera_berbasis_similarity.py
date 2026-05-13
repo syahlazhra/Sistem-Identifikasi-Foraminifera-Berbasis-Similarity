@@ -1,14 +1,67 @@
-from google.colab import files
-uploaded = files.upload()
+# app.py
 
+```python
+import streamlit as st
 import pandas as pd
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics.pairwise import cosine_similarity
 
-file_name = list(uploaded.keys())[0]
-df = pd.read_csv(file_name, sep=';')
+st.set_page_config(
+    page_title="Identifikasi Foraminifera",
+    page_icon="🔬",
+    layout="wide"
+)
 
-print("=== DATA AWAL ===")
-print(df.head())
+# =========================
+# CSS STYLE
+# =========================
+st.markdown(
+    """
+    <style>
+    .main {
+        background-color: #f5f7fa;
+    }
 
+    .title {
+        text-align: center;
+        font-size: 42px;
+        font-weight: bold;
+        color: #1f4e79;
+        margin-bottom: 10px;
+    }
+
+    .subtitle {
+        text-align: center;
+        font-size: 18px;
+        color: #555;
+        margin-bottom: 30px;
+    }
+
+    .result-box {
+        background-color: white;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# =========================
+# TITLE
+# =========================
+st.markdown('<div class="title">🔬 Sistem Identifikasi Foraminifera</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="subtitle">Metode Similarity Menggunakan Cosine Similarity</div>',
+    unsafe_allow_html=True
+)
+
+# =========================
+# IMAGE DATABASE
+# =========================
 image_urls = {
     "Globigerina_bulloides": "https://www.mikrotax.org/images/pf_cenozoic/Globigerinidae/Globigerina/Globigerina%20bulloides/K_S%201983%2006-4.JPG",
     "Globorotalia_menardii": "https://www.mikrotax.org/images/pf_cenozoic/Globorotaliidae/Globorotalia/menardii%20lineage/Globorotalia%20menardii/K_S%201983%2029-1.JPG",
@@ -27,173 +80,156 @@ image_urls = {
     "Planorbulina_sp": "https://images.marinespecies.org/thumbs/173349_planorbulinella-larvata.jpg"
 }
 
-df['spesies'] = df['spesies'].str.strip()
-df['spesies'] = df['spesies'].str.replace(" ", "_")
+# =========================
+# FILE UPLOAD
+# =========================
+st.sidebar.header("📂 Upload Dataset")
 
-df['image'] = df['spesies'].map(image_urls)
-
-import pandas as pd
-
-file_name = list(uploaded.keys())[0]
-df = pd.read_csv(file_name, sep=';')
-
-# autofix kolom
-df.columns = df.columns.str.strip()
-df.columns = df.columns.str.lower()
-df.columns = df.columns.str.replace(" ", "_")
-
-print("=== NAMA KOLOM ===")
-print(df.columns)
-
-# Clean the 'spesies' column to match image_urls keys
-df['spesies'] = df['spesies'].str.strip()
-df['spesies'] = df['spesies'].str.replace(" ", "_")
-
-# Map image URLs to the DataFrame
-df['image'] = df['spesies'].map(image_urls)
-
-print("First 5 rows with image URLs:")
-display(df[['spesies', 'image']].head())
-
-features = [
-    'jumlah_kamar',
-    'ukuran',
-    'bentuk_cangkang',
-    'spiral',
-    'tekstur',
-    'ostia',
-    'oskula',
-    'spongocoel',
-    'body_wall'
-]
-
-df_features = df[features]
-
-print(df_features.head())
-
-df_encoded = pd.get_dummies(df_features)
-
-print(df_encoded.head())
-
-from sklearn.preprocessing import MinMaxScaler
-
-scaler = MinMaxScaler()
-df_scaled = scaler.fit_transform(df_encoded)
-
-input_data = pd.DataFrame([{
-    'jumlah_kamar': 7,
-    'ukuran': 150,
-    'bentuk_cangkang': 'bulat',
-    'spiral': 'trochoid',
-    'tekstur': 'halus',
-    'ostia': 'kecil',
-    'oskula': 'tidak_ada',
-    'spongocoel': 'tidak_ada',
-    'body_wall': 'sedang'
-}])
-
-input_encoded = pd.get_dummies(input_data)
-
-input_encoded = input_encoded.reindex(
-    columns=df_encoded.columns,
-    fill_value=0
+uploaded_file = st.sidebar.file_uploader(
+    "Upload file CSV",
+    type=["csv"]
 )
 
-input_scaled = scaler.transform(input_encoded)
-input_scaled = input_scaled[0]
+if uploaded_file is not None:
 
-import numpy as np
+    df = pd.read_csv(uploaded_file, sep=';')
 
-def euclidean(a, b):
-    return np.sqrt(np.sum((a - b)**2))
+    # CLEANING
+    df.columns = df.columns.str.strip()
+    df.columns = df.columns.str.lower()
+    df.columns = df.columns.str.replace(" ", "_")
 
-distances = []
+    df['spesies'] = df['spesies'].str.strip()
+    df['spesies'] = df['spesies'].str.replace(" ", "_")
 
-for row in df_scaled:
-    distances.append(euclidean(input_scaled, row))
+    # ADD IMAGE
+    df['image'] = df['spesies'].map(image_urls)
 
-df['distance'] = distances
+    # FEATURES
+    features = [
+        'jumlah_kamar',
+        'ukuran',
+        'bentuk_cangkang',
+        'spiral',
+        'tekstur',
+        'ostia',
+        'oskula',
+        'spongocoel',
+        'body_wall'
+    ]
 
-import ipywidgets as widgets
-from IPython.display import display
+    df_features = df[features]
 
-jumlah_kamar = widgets.IntText(description='Jumlah kamar')
-ukuran = widgets.IntText(description='Ukuran (µm)')
+    # ENCODING
+    df_encoded = pd.get_dummies(df_features)
 
-bentuk_cangkang = widgets.Dropdown(
-    options=['bulat','oval','memanjang'],
-    description='Bentuk'
-)
+    # SCALING
+    scaler = MinMaxScaler()
+    df_scaled = scaler.fit_transform(df_encoded)
 
-spiral = widgets.Dropdown(
-    options=['trochoid','planispiral','serial','spherical'],
-    description='Spiral'
-)
+    # =========================
+    # INPUT FORM
+    # =========================
+    st.sidebar.header("🧪 Input Karakteristik")
 
-tekstur = widgets.Dropdown(
-    options=['halus','kasar'],
-    description='Tekstur'
-)
+    jumlah_kamar = st.sidebar.number_input("Jumlah Kamar", min_value=1, value=7)
+    ukuran = st.sidebar.number_input("Ukuran (µm)", min_value=1, value=150)
 
-ostia = widgets.Dropdown(options=['kecil','besar'], description='Ostia')
-oskula = widgets.Dropdown(options=['ada','tidak_ada'], description='Oskula')
-spongocoel = widgets.Dropdown(options=['ada','tidak_ada'], description='Spongocoel')
-body_wall = widgets.Dropdown(options=['tipis','sedang','tebal','agregat'], description='Body wall')
-
-btn = widgets.Button(description="Proses")
-
-display(
-    jumlah_kamar, ukuran, bentuk_cangkang, spiral,
-    tekstur, ostia, oskula, spongocoel, body_wall, btn
-)
-
-from IPython.display import Image, display
-from sklearn.metrics.pairwise import cosine_similarity
-from IPython.display import clear_output
-
-def on_button_click(b):
-    clear_output(wait=True);
-
-
-    display(
-        jumlah_kamar, ukuran, bentuk_cangkang, spiral,
-        tekstur, ostia, oskula, spongocoel, body_wall, btn
+    bentuk_cangkang = st.sidebar.selectbox(
+        "Bentuk Cangkang",
+        ['bulat', 'oval', 'memanjang']
     )
 
-    input_user = {
-        'jumlah_kamar': jumlah_kamar.value,
-        'ukuran': ukuran.value,
-        'bentuk_cangkang': bentuk_cangkang.value,
-        'spiral': spiral.value,
-        'tekstur': tekstur.value,
-        'ostia': ostia.value,
-        'oskula': oskula.value,
-        'spongocoel': spongocoel.value,
-        'body_wall': body_wall.value
-    }
+    spiral = st.sidebar.selectbox(
+        "Spiral",
+        ['trochoid', 'planispiral', 'serial', 'spherical']
+    )
 
-    df_input = pd.DataFrame([input_user])
-    df_input_encoded = pd.get_dummies(df_input)
-    df_input_encoded = df_input_encoded.reindex(columns=df_encoded.columns, fill_value=0)
+    tekstur = st.sidebar.selectbox(
+        "Tekstur",
+        ['halus', 'kasar']
+    )
 
-    df_input_scaled = scaler.transform(df_input_encoded)
+    ostia = st.sidebar.selectbox(
+        "Ostia",
+        ['kecil', 'besar']
+    )
 
-    similarity = cosine_similarity(df_input_scaled, df_scaled)[0]
-    df['similarity'] = similarity * 100
+    oskula = st.sidebar.selectbox(
+        "Oskula",
+        ['ada', 'tidak_ada']
+    )
 
-    top5 = df.sort_values('similarity', ascending=False).head(5)
+    spongocoel = st.sidebar.selectbox(
+        "Spongocoel",
+        ['ada', 'tidak_ada']
+    )
 
-    print("\n=== HASIL ===\n")
+    body_wall = st.sidebar.selectbox(
+        "Body Wall",
+        ['tipis', 'sedang', 'tebal', 'agregat']
+    )
 
-    for i, row in top5.iterrows():
-        print(f"Spesies: {row['spesies']}")
-        print(f"Similarity: {row['similarity']:.2f}%")
+    # =========================
+    # BUTTON
+    # =========================
+    if st.sidebar.button("🔍 Identifikasi"):
 
-        if 'image' in row.index and isinstance(row['image'], str):
-            display(Image(url=row['image'], width=200))
-        else:
-            print("❌ gambar tidak ada")
+        input_user = {
+            'jumlah_kamar': jumlah_kamar,
+            'ukuran': ukuran,
+            'bentuk_cangkang': bentuk_cangkang,
+            'spiral': spiral,
+            'tekstur': tekstur,
+            'ostia': ostia,
+            'oskula': oskula,
+            'spongocoel': spongocoel,
+            'body_wall': body_wall
+        }
 
-        print("-"*30)
+        df_input = pd.DataFrame([input_user])
 
-btn.on_click(on_button_click)
+        # ENCODE INPUT
+        df_input_encoded = pd.get_dummies(df_input)
+        df_input_encoded = df_input_encoded.reindex(
+            columns=df_encoded.columns,
+            fill_value=0
+        )
+
+        # SCALE INPUT
+        df_input_scaled = scaler.transform(df_input_encoded)
+
+        # COSINE SIMILARITY
+        similarity = cosine_similarity(df_input_scaled, df_scaled)[0]
+
+        df['similarity'] = similarity * 100
+
+        # TOP RESULT
+        top5 = df.sort_values('similarity', ascending=False).head(5)
+
+        st.success("✅ Identifikasi berhasil dilakukan")
+
+        st.subheader("🏆 Top 5 Similarity")
+
+        for i, row in top5.iterrows():
+
+            col1, col2 = st.columns([1, 2])
+
+            with col1:
+                if pd.notnull(row['image']):
+                    st.image(row['image'], width=220)
+                else:
+                    st.warning("Gambar tidak tersedia")
+
+            with col2:
+                st.markdown(f"### {row['spesies']}")
+                st.progress(int(row['similarity']))
+                st.write(f"Similarity: {row['similarity']:.2f}%")
+
+            st.markdown("---")
+
+    # =========================
+    # DATA PREVIEW
+    # =========================
+    with st.expander("📊 Preview Dat
+```
